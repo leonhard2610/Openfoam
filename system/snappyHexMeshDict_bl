@@ -1,0 +1,281 @@
+/*-------------------------------*- C++ -*----------------------------------*\
+  =========                 |				
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Website:  https://openfoam.org
+    \\  /    A nd           | Version:  12                                  	
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    format      ascii;
+    class       dictionary;
+    object      snappyHexMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+
+// Which of the steps to run
+castellatedMesh false;
+snap            false;
+addLayers       true;
+
+
+geometry
+{
+    gas_gen
+    {
+        type triSurfaceMesh;
+        file "gas_gen.stl";
+
+        regions
+        {
+            inlet { name inlet;}
+            topBottom {name outlet_topBottom;}
+            outlet_right { name outlet_right;}
+            outlet_left { name outlet_left;}
+            walls { name nozzle;}
+            front { name front;}
+            back { name back;}
+        }
+
+    }
+
+    // nozzleRegion
+    // {
+    //     type triSurfaceMesh;
+    //     file "nozzleRegion.stl";
+    // }
+
+    refinementBox
+    {
+        type searchableBox;
+        min  (-0.76 0.382 -0.01);
+        max  (-0.5 0.45 0.025);
+    }
+
+    refinementNozzleExit
+    {
+        type searchableBox;
+        min  (-0.8 0.395 -0.01);
+        max  (-0.72 0.44 0.025);
+    }
+};
+
+
+// Settings for the castellatedMesh generation.
+castellatedMeshControls
+{
+    // Refinement parameters
+    maxLocalCells  1000000;
+
+    maxGlobalCells 20000000;
+
+    minRefinementCells  1; //0-10
+    
+    maxLoadUnbalance 0.10;
+
+    nCellsBetweenLevels 3;	//2-6
+
+    planarAngle 30;
+
+    allowFreeStandingZoneFaces true;
+
+    // Extend refinement regions to the span of the surface facet/triangles
+    extendedRefinementSpan true;
+
+    resolveFeatureAngle 30;
+
+    // Explicit feature edge refinement
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    features
+    (
+
+    );
+
+
+    // Surface based refinement
+    refinementSurfaces
+    {
+    }
+
+
+    // Region-wise refinement
+    refinementRegions
+    {
+      
+    }
+
+
+    //gapLevelIncrement 2;
+
+
+    // Mesh selection
+    locationInMesh (-0.5 0.41 0.01); 
+
+}
+
+// Settings for the snapping.
+snapControls
+{
+    nSmoothPatch 3;     //recommended
+    //nSmoothPatch 10;      //improved  - Increase when faces are incorrectly oriented - Might affect BL growths
+
+    tolerance 2.0;
+
+    nSolveIter 50;      //recommended
+    //nSolveIter 100;       //improved
+
+    //nRelaxIter 5;
+    nRelaxIter 10;        //improved  10-20-50
+
+    // Feature snapping
+
+    nFeatureSnapIter 10;    //recommended
+    //nFeatureSnapIter 100; //improved  20-50-100
+
+
+    implicitFeatureSnap true;
+
+    // Use castellatedMeshControls::features (default = true)
+    explicitFeatureSnap false;
+
+    // Detect features between multiple surfaces
+    // (only for explicitFeatureSnap, default = false)
+    multiRegionFeatureSnap false;
+
+
+}
+
+
+// Settings for the layer addition.
+addLayersControls
+{
+    relativeSizes false;
+
+    // Layer thickness specification. This can be specified in one of following
+    // ways:
+    // - expansionRatio and finalLayerThickness (cell nearest internal mesh)
+    // - expansionRatio and firstLayerThickness (cell on surface)
+    // - overall thickness and firstLayerThickness
+    // - overall thickness and finalLayerThickness
+    // - overall thickness and expansionRatio
+    //
+    // Note: the mode thus selected is global, i.e. one cannot override the
+    //       mode on a per-patch basis (only the values can be overridden)
+
+    expansionRatio 1.2;
+    finalLayerThickness 0.005;
+    // firstLayerThickness 0.3;
+    // thickness 0.5
+    minThickness 0.0025;
+
+
+    layers
+    {
+    
+        nozzle
+        {
+            //local control
+            nSurfaceLayers 3;        
+            expansionRatio 1.2;
+            finalLayerThickness 0.0002;
+    	    minThickness 0.00001;
+    	}
+
+        // inlet
+        // {
+        //     //local control
+        //     nSurfaceLayers 1;        
+        //     expansionRatio 1.2;
+        //     finalLayerThickness 0.0002;
+        //     minThickness 0.00001;
+        // }
+
+    }
+        
+    nGrow 2;
+
+    //featureAngle                130;		//recommended
+    //featureAngle              330;		//improved
+
+    featureAngle                170;
+
+    maxFaceThicknessRatio       0.3;
+    
+    // slipFeatureAngle            70;     //Default is 0.5*featureAngle.
+
+// Patch displacement 
+    nSmoothSurfaceNormals       5;
+    nSmoothThickness            10;
+    
+// Medial axis analysis
+    nSmoothNormals              5;
+    maxThicknessToMedialRatio   0.3;    //0.3D 0.6
+    minMedialAxisAngle          80;
+    //nMedialAxisIter             10;
+    //nSmoothDisplacement       0;
+    //detectExtrusionIsland     false;
+
+// Mesh shrinking
+    nLayerIter                  50;	//Set to 1 to disable quality checks
+    nBufferCellsNoExtrude       0;
+    nRelaxedIter                20;
+    nRelaxIter                  5;
+    additionalReporting       false;
+
+    
+}
+
+
+meshQualityControls
+{
+    #include "meshQualityDict"
+
+    relaxed
+    {
+        // Maximum non-orthogonality allowed. Set to 180 to disable.
+        maxNonOrtho 75;
+    }
+
+    //minFlatness 0.5;
+
+    // Advanced
+
+        // Number of error distribution iterations
+        nSmoothScale 4;
+        // amount to scale back displacement at error points
+        errorReduction 0.75;
+}
+
+
+// Advanced
+
+//// Debug flags
+
+debugFlags
+(
+    //mesh            // write intermediate meshes
+    //intersections   // write current mesh intersections as .obj files
+    //featureSeeds    // write information about explicit feature edge refinement
+    //attraction      // write attraction as .obj files
+    //layerInfo       // write information about layers
+);
+
+
+//
+//// Write flags
+
+writeFlags
+(
+    scalarLevels    // write volScalarField with cellLevel for postprocessing
+    layerSets       // write cellSets, faceSets of faces in layer
+    layerFields     // write volScalarField for layer coverage
+);
+
+//**************************************************************************************************************************
+
+
+
+mergeTolerance 1e-6;	//1e-8
+
+// ************************************************************************* //

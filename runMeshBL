@@ -1,0 +1,8 @@
+#!/bin/bash
+
+rm *.obj > /dev/null 2>&1
+rm -rf 3 > /dev/null 2>&1
+
+snappyHexMesh -dict system/snappyHexMeshDict_bl | tee log.shmbl
+
+checkMesh -writeSets -writeSurfaces -latestTime | tee log.checkmeshbl

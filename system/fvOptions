@@ -1,0 +1,12 @@
+limitT
+{
+    type            limitTemperature;
+    active          yes;
+    
+    limitTemperatureCoeffs
+    {
+        selectionMode   all;
+        min             280;
+        max             3500;  // Allow combustion temperatures
+    }
+}

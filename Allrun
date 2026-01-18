@@ -1,0 +1,88 @@
+#!/bin/sh
+
+cd ${0%/*} || exit 1    # Run from this directory
+
+. $WM_PROJECT_DIR/bin/tools/RunFunctions 
+
+foamCleanTutorials
+
+#if dir 0-org exists then rm dir 0 and suppres all output OR(||) if dir 0 then ...
+[ -d "0_org" ] && rm -r 0 > /dev/null 2>&1 || [ -d "0" ] && cp -r 0 0_org && rm -r 0
+
+runApplication surfaceFeatures
+runApplication blockMesh
+
+# getting the number of avialiable processors
+N_PROCS=$(grep ^cpu\\scores /proc/cpuinfo | uniq |  awk '{print $4}')
+[ -z "$N_PROCS" ] && N_PROCS=4 # if N_PROCS not found, set it to 4
+
+# editing the decomposeParDict to set the number of processors
+foamDictionary system/decomposeParDict -entry numberOfSubdomains -set $N_PROCS
+runApplication decomposePar
+
+
+#edit controlDict for snappyHexMesh
+foamDictionary system/controlDict -entry deltaT -set 1 
+foamDictionary system/controlDict -entry endTime -set 1 
+foamDictionary system/controlDict -entry writeInterval -set 1 
+foamDictionary system/controlDict -entry purgeWrite -set 0 
+
+# running snappy in parallel
+mpirun -np $N_PROCS snappyHexMesh -parallel -dict system/snappyHexMeshDict | tee log.snappyHexMesh
+
+
+mpirun -np $N_PROCS checkMesh -writeSets -writeSurfaces -parallel -latestTime | tee log.checkMesh
+#mpirun -np $N_PROCS createPatch -parallel -overwrite | tee log.createPatch
+
+
+reconstructPar
+rm -rf constant/polyMesh/
+cp -r 3/polyMesh/ constant/
+rm -rf 1 2 3
+cp -r 0_org 0
+
+foamListTimes -processor -rm
+
+#New way to rename entires in dictionaries
+#entry0 is default dictionary block
+foamDictionary constant/polyMesh/boundary -entry entry0/inlet/type -set patch
+foamDictionary constant/polyMesh/boundary -entry entry0/outlet_left/type -set patch
+foamDictionary constant/polyMesh/boundary -entry entry0/outlet_right/type -set patch
+foamDictionary constant/polyMesh/boundary -entry entry0/outlet_topBottom/type -set patch
+foamDictionary constant/polyMesh/boundary -entry entry0/front/type -set empty
+foamDictionary constant/polyMesh/boundary -entry entry0/back/type -set empty
+#
+foamDictionary constant/polyMesh/boundary -entry entry0/inlet/inGroups -remove
+foamDictionary constant/polyMesh/boundary -entry entry0/outlet_left/inGroups -remove
+foamDictionary constant/polyMesh/boundary -entry entry0/outlet_right/inGroups -remove
+foamDictionary constant/polyMesh/boundary -entry entry0/outlet_topBottom/inGroups -remove
+foamDictionary constant/polyMesh/boundary -entry entry0/front/inGroups -remove
+foamDictionary constant/polyMesh/boundary -entry entry0/back/inGroups -remove
+#
+#
+extrudeMesh
+
+topoSet
+
+setFields
+	
+decomposePar
+#
+
+#resetting deltaT in controlDict
+foamDictionary system/controlDict -entry deltaT -set 1e-6
+foamDictionary system/controlDict -entry endTime -set 0.01 
+foamDictionary system/controlDict -entry writeInterval -set 1e-6 
+foamDictionary system/controlDict -entry purgeWrite -set 10 
+
+#mpirun -np $N_PROCS foamRun -parallel | tee log.solver #see output on screen but also saves to file
+
+#plot residuals using residuals function
+mpirun -np $N_PROCS foamRun -parallel > log.solver & #no output on screen but saves to file 
+#foamMonitor -l postProcessing/residuals/0/residuals.dat &
+
+#reconstructPar
+
+#foamPostProcess -func "yPlus" -solver shockFluid_debug
+
+#------------------------------------------------------------------------------

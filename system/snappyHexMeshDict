@@ -1,0 +1,269 @@
+/*-------------------------------*- C++ -*----------------------------------*\
+  =========                 |				
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Website:  https://openfoam.org
+    \\  /    A nd           | Version:  12                                  	
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    format      ascii;
+    class       dictionary;
+    object      snappyHexMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+
+// Which of the steps to run
+castellatedMesh true;
+snap            true;
+addLayers       false;
+
+
+geometry
+{
+    gas_gen
+    {
+        type triSurfaceMesh;
+        file "gas_gen.stl";
+
+        regions
+        {
+            inlet { name inlet;}
+            topBottom {name topBottom;}
+            outlet_right { name outlet_right;}
+            outlet_left { name outlet_left;}
+            walls { name nozzle;}
+            front { name front;}
+            back { name back;}
+        }
+
+    }
+
+    // refinementBox
+    // {
+    //     type searchableBox;
+    //     min  (-1 0.382 -0.01);
+    //     max  (-0.5 0.475 0.025);
+    // }
+
+    // refinementNozzleExit
+    // {
+    //     type searchableBox;
+    //     min  (-0.8 0.395 -0.01);
+    //     max  (-0.72 0.44 0.025);
+    // }
+};
+
+
+// Settings for the castellatedMesh generation.
+castellatedMeshControls
+{
+    // Refinement parameters
+    maxLocalCells  1000000;
+
+    maxGlobalCells 20000000;
+
+    minRefinementCells  1; //0-10
+    
+    maxLoadUnbalance 0.10;
+
+    nCellsBetweenLevels 6;	//2-6
+
+    planarAngle 30;
+
+    allowFreeStandingZoneFaces true;
+
+    // Extend refinement regions to the span of the surface facet/triangles
+    extendedRefinementSpan true;
+
+    resolveFeatureAngle 15;
+
+    // Explicit feature edge refinement
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    features
+    (
+        {
+            file "gas_gen.eMesh";
+            level 0;			//0 - 4E
+            //levels ((0.001 1 ));		//3 D-W same as region
+        }
+
+    );
+
+
+    // Surface based refinement
+    refinementSurfaces
+    {
+        gas_gen
+        {
+            //level (1 1);	//Corners problematic due to low resolution due to high curvature | D with region refinement 3
+            level (0 0);
+            //level (2 4);	//better ref. at intersections
+            //level (4 4);	//better overall
+
+
+            regions
+	        {
+
+                walls
+                {
+                    level (4 4);
+                    patchInfo {type wall;}
+                }
+
+                outlet_left
+                {
+                    level (2 2);
+                    patchInfo {type patch;}
+                }
+
+                inlet
+                {
+                    level (3 3);
+                    patchInfo {type patch;}
+                }
+
+            }
+
+        }
+
+        // nozzleRegion
+        // {
+        //     level (3 3);
+        //     faceZone insideFaces;
+        //     cellZone insideZone;
+        //     cellZoneInside insidePoint;
+        //     insidePoint (-0.85 0.41 0.01);
+        // }
+    }
+
+
+    // Region-wise refinement
+    refinementRegions
+    {
+        gas_gen
+        {
+            mode inside;
+            level 2;	//2 - 3 D - 4
+        }
+
+        // refinementBox
+        //     {
+        //         mode inside;
+        //         levels ((1E15 3));  
+        //         // 1E15 = ignored (effectively "all cells inside")
+        //         // 5 = refinement level
+        //     }
+
+        // refinementNozzleExit
+        //     {
+        //         mode inside;
+        //         levels ((1E15 2));  
+        //         // 1E15 = ignored (effectively "all cells inside")
+        //         // 5 = refinement level
+        //     }
+    }
+
+
+    //gapLevelIncrement 2;
+
+
+    // Mesh selection
+    locationInMesh (-0.5 0.41 0.019); 
+
+}
+
+// Settings for the snapping.
+snapControls
+{
+    nSmoothPatch 3;     //recommended
+    // nSmoothPatch 10;      //improved  - Increase when faces are incorrectly oriented - Might affect BL growths
+
+    tolerance 2.0;
+
+    nSolveIter 50;      //recommended
+    //nSolveIter 100;       //improved
+
+    //nRelaxIter 5;
+    nRelaxIter 10;        //improved  10-20-50
+
+    // Feature snapping
+
+    nFeatureSnapIter 10;    //recommended
+    //nFeatureSnapIter 100; //improved  20-50-100
+
+
+    implicitFeatureSnap false;
+
+    // Use castellatedMeshControls::features (default = true)
+    explicitFeatureSnap true;
+
+    // Detect features between multiple surfaces
+    // (only for explicitFeatureSnap, default = false)
+    multiRegionFeatureSnap false;
+
+
+}
+
+
+// Settings for the layer addition.
+addLayersControls
+{
+    
+    
+}
+
+
+meshQualityControls
+{
+    #include "meshQualityDict"
+
+    relaxed
+    {
+        // Maximum non-orthogonality allowed. Set to 180 to disable.
+        maxNonOrtho 75;
+    }
+
+    //minFlatness 0.5;
+
+    // Advanced
+
+        // Number of error distribution iterations
+        nSmoothScale 4;
+        // amount to scale back displacement at error points
+        errorReduction 0.75;
+}
+
+
+// Advanced
+
+//// Debug flags
+
+debugFlags
+(
+    //mesh            // write intermediate meshes
+    //intersections   // write current mesh intersections as .obj files
+    //featureSeeds    // write information about explicit feature edge refinement
+    //attraction      // write attraction as .obj files
+    //layerInfo       // write information about layers
+);
+
+
+//
+//// Write flags
+
+writeFlags
+(
+    scalarLevels    // write volScalarField with cellLevel for postprocessing
+    layerSets       // write cellSets, faceSets of faces in layer
+    layerFields     // write volScalarField for layer coverage
+);
+
+//**************************************************************************************************************************
+
+
+
+mergeTolerance 1e-6;	//1e-8
+
+// ************************************************************************* //
